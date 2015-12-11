@@ -20,7 +20,7 @@ nRooms = 22  # DDM 2014: 22
 nRounds = 7  # DDM 2014: 7
 
 nSims = 1e3  # number of tournaments to simulate
-size_of_break = 8
+size_of_break = 16  # DDM 2014: 16
 
 # automatically set - don't edit
 nTeams = 4*nRooms
