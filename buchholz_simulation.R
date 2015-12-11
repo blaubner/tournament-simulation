@@ -5,11 +5,14 @@
 
 ## debate model
 # input variables
-team_spread = 5  # std deviation for team strength, centered at 150 points
-tournament_spread = sqrt(2) * team_spread  # std deviation of team strength distribution across tournament
-nRooms = 100
+team_spread = 3  # std deviation for team strength, centered at 150 points - 4.79 is the mean of stdevs of team speaks at DDM 2014
+tournament_spread = 2*team_spread  # std deviation of team strength distribution across tournament - 4.72 is the stdev of mean team speaks at DDM 2014
+nRooms = 22
 nTeams = 4*nRooms
-nRounds = 9
+nRounds = 7
+
+nSims = 1e3
+size_of_break = 16
 
 
 ## team data -- drawn at random for each tournament later
@@ -38,21 +41,27 @@ draw1 = function() {
 
 ## Draw Rounds >= 2
 room_vec = rep( 1:nRooms, rep(4, nRooms) )  # gives 1 1 1 1 2 2 2 2 3 3 3 3 4 ...
-draw2 = function( team_points ) {
+draw2 = function( round_results, round_rooms ) {
   # later rounds are drawn based on power-pairing
   # here we just sort the teams and group them into contiguous groups of 4 (without regard for 
   # the details of pull-ups - this can be improved!)
-  ranking = order(order(team_points, decreasing = TRUE))  # gives for each team the current tab position
+  team_points = rowSums(round_results)
+  #ranking = order(order(team_points, decreasing = TRUE))  # gives for each team the current tab position
+  
+  # here's the version with pull-ups (based on partial Buchholz points)
+  partial_Buchholz_points = get_Buchholz_tab(round_rooms, round_results)
+  ranking = order(order(team_points, partial_Buchholz_points, decreasing = TRUE))  # gives for each team the current tab position
+  
   draw = room_vec[ranking]
   return(draw)
 }
 
 ## Generic draw function - for disambiguation
-get_draw = function( round_results ) {
+get_draw = function( round_results, round_rooms ) {
   if (ncol(round_results) == 0) {
     return( draw1() )
   } else {
-    return( draw2(rowSums(round_results)) )
+    return( draw2(round_results, round_rooms) )
   }
 }
 
@@ -61,7 +70,7 @@ run_tournament = function( team_strengths ) {
   round_results = data.frame()
   round_rooms = data.frame()  # this is for later retracing the tournament - can be left out
   for (round in 1:nRounds) {
-    draw = get_draw( round_results )
+    draw = get_draw( round_results, round_rooms )
     team_points = random_round(team_strengths, draw)
     
     round_results = data.frame(c( round_results, data.frame(team_points) ))
@@ -101,8 +110,6 @@ get_Buchholz_tab = function(round_rooms, round_results) {
 
 
 ## simulation
-nSims = 1e3
-size_of_break = 32
 library(parallel)
 library(Kendall)
 
@@ -114,12 +121,15 @@ extract_stats = function( tab ) {
   stats$tau_strength_points = Kendall(ordered_tab$strength, ordered_tab$Total_points)$tau[1]
   stats$tau_strength_buchholz = Kendall(ordered_tab$strength, ordered_tab$Buchholz_points)$tau[1]
   clashes = aggregate( ID ~ Total_points + Buchholz_points, data = tab, FUN = "length" )
-  assign("clashes", clashes, envir = globalenv())
+  #assign("clashes", clashes, envir = globalenv())
   clashes_at_18 = clashes[clashes$Total_points == 18, ]
   stats$percent_rank_equality = (nrow(tab) - nrow(clashes)) / nrow(tab)
   stats$clashes_at_18 = sum(clashes_at_18$ID) - nrow(clashes_at_18) 
   stats$clash_at_break = ( (ordered_tab$Total_points[size_of_break] == ordered_tab$Total_points[size_of_break+1]) &&
                            (ordered_tab$Buchholz_points[size_of_break] == ordered_tab$Buchholz_points[size_of_break+1]) )
+  top_teams = order(tab$strength, decreasing = TRUE)[1:(size_of_break/2)]  # top teams correspond to half size of break
+  stats$n_top_teams_in_break = sum(top_teams %in% ordered_tab$ID[1:size_of_break])
+  stats$stdev_team_points = sd(tab$Total_points)
   return(stats)
 }
 
@@ -144,28 +154,30 @@ extract_results = function(res) {
   statresults = list()
   for (name in statnames) {
     statvec = sapply(res, function(x) {x[[name]]})
-    print(statvec[1:10])
+    #print(statvec[1:10])
     statresults[name] = mean(statvec)
   }
   return(statresults)
 }
 
-mean_results = extract_results(sim_results)
+mean_stats = extract_results(sim_results)
 
 
 testfunctions = function() {
-  x = seq(100,200,length=1000)
-  y = dnorm(x, mean=150, sd = sqrt(2)*team_spread)
+  # plot team strength distribution function
+  x = seq(120,180,length=1000)
+  y = dnorm(x, mean=150, sd = tournament_spread)
   plot(x, y, type = 'l')
   
-  x = seq(-3,5,length=100)
-  y = dnorm(x, mean = 1)
-  plot(x, y, type = 'l')
-  
+  # run a random tournament once
   tab = random_tournament()
   ordered_tab = tab[order(tab$Total_points, tab$Buchholz_points, decreasing = TRUE), ]
   ordered_tab = data.frame(ordered_tab, Rank = 1:nTeams)
+  extract_stats(tab)
   
+  # plot the bucket sizes for each amount of team points in simulated tab
+  simtab_teampoints_dist = aggregate(tab$ID, by = list(tab$Total_points), FUN = "length")
+  plot(simtab_teampoints_dist)
 }
 
 # NOT USED
