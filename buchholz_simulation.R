@@ -16,11 +16,11 @@ cl = makeCluster(3)  # this speeds up the repeated simulation of tournaments
 # input variables
 team_spread = 3  # std deviation for team strength, centered at 150 points - 4.79 is the mean of stdevs of team speaks at DDM 2014
 tournament_spread = 2*team_spread  # std deviation of team strength distribution across tournament - 4.72 is the stdev of mean team speaks at DDM 2014
-nRooms = 22  # DDM 2014: 22
-nRounds = 7  # DDM 2014: 7
+nRooms = 10  # DDM 2014: 22
+nRounds = 5  # DDM 2014: 7
 
 nSims = 1e3  # number of tournaments to simulate
-size_of_break = 16  # DDM 2014: 16
+size_of_break = 8  # DDM 2014: 16
 
 # automatically set - don't edit
 nTeams = 4*nRooms
